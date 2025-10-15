@@ -6,6 +6,7 @@ import helmet from "helmet";
 import cors from "cors";
 import authRoutes from './routes/auth'
 import { connectDB } from "./config/database";
+import errorHandler from "./middleware/errorHandler";
 
 dotenv.config();
 connectDB();
@@ -24,6 +25,8 @@ app.get("/api/v1", (req: Request, res: Response) => {
   });
 });
 app.use("/api/v1/auth", authRoutes)
+
+app.use(errorHandler)
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`${PORT} listen server`);
