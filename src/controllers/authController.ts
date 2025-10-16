@@ -3,7 +3,7 @@ import { User } from "../models/User";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-
+import CustomError from "../utils/CustomError";
 export const signup = async (req: Request, res: Response) => {
   try {
     const { email, password, username } = req.body;
