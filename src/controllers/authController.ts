@@ -1,4 +1,4 @@
-import { ErrorRequestHandler, Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { User } from "../models/User";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -7,7 +7,6 @@ import jwt from "jsonwebtoken";
 export const signup = async (req: Request, res: Response) => {
   try {
     const { email, password, username } = req.body;
-    console.log(req.body)
     if (!email || !password || !username) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -36,16 +35,22 @@ export const signup = async (req: Request, res: Response) => {
         .status(409)
         .json({ message: "Username or email already taken" });
     }
-    console.log(error)
+    console.log(error);
     return res.status(500).json({ message: "Server error" });
   }
 };
 
-export const verifyEmail = async (req: Request, res: Response) => {
+export const verifyEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { token } = req.body;
     if (!token) {
-      return res.status(400).json({ message: "Verification token is required" });
+      return res
+        .status(400)
+        .json({ message: "Verification token is required" });
     }
 
     const user = await User.findOne({ verificationToken: token });
@@ -64,7 +69,11 @@ export const verifyEmail = async (req: Request, res: Response) => {
   }
 };
 
-export const signin = async (req: Request, res: Response) => {
+export const signin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -72,31 +81,58 @@ export const signin = async (req: Request, res: Response) => {
     }
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
+    return next(new CustomError("Invalid email or password", 401));
     }
     if (!user.isVerified) {
-      return res.status(401).json({ message: "Please verify email" });
+    return next(new CustomError("Please verify email", 401));
     }
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      return res.status(400).json({ message: "Invalid email or password" });
+    return next(new CustomError("Invalid email or password", 400));
     }
-    const token = jwt.sign(
-        {userId: user._id},
-        process.env.JWT_SECRET!,
-        {expiresIn: '3d'}
-    )
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET!, {
+      expiresIn: "3d",
+    });
     return res.status(200).json({
       message: "User logged in successfully",
       userId: user._id,
-      access_token: token
+      access_token: token,
     });
   } catch (error: any) {
     if (error.code === 11000) {
-      return res
-        .status(409)
-        .json({ message: "Username or email already taken" });
+      next(new CustomError("Username or email already taken", 409));
     }
+    next(new CustomError("Server error", 500));
+  }
+};
+
+export const logout = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+     return res.status(204).json({ message: "Logout successfully" });
+  } catch (error) {
+     return next(new CustomError("Something went wrong during logout", 500));
+  }
+};
+
+export const getMe = async (req: Request, res: Response) => {
+  try {
+    // We'll attach user ID in middleware soon
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const user = await User.findById(userId).select('-password -verificationToken');
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json(user);
+  } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
 };

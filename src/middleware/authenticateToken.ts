@@ -1,6 +1,13 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from 'jsonwebtoken'
 import { JwtPayload } from "../types";
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { userId: string };
+    }
+  }
+}
 
 const authenticateToken = async (
   req: Request,
@@ -15,7 +22,7 @@ const authenticateToken = async (
       return res.status(401).json({ message: "Please login" });
     }
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
-    console.log(decoded);
+    req.user = { userId: decoded.userId }; // ✅ Attach to req
     next();
   } catch {
     res.status(401).json({ message: "Invalid token" });
